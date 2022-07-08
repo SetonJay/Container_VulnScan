@@ -1,0 +1,60 @@
+pipeline {
+  environment {
+    registry = 'registry.gitlab.com'
+    registryCredential = 'gitlab-registry'
+    repository = 'continer-pipeline/jenkins-demo'
+    imageLine = 'registry.gitlab.com/continer-pipeline/jenkins-demo:latest'
+    TEMPLATE_PATH= '@html.tpl'
+  }
+  agent any
+  stages {
+    stage('Checkout SCM') {
+      steps {
+        checkout scm
+      }
+    }
+    stage('Build image and push to registry') {
+      steps {
+        sh 'docker --version'
+        script {
+          docker.withRegistry('https://' + registry, registryCredential) {
+            def image = docker.build(repository)
+            image.push()
+          }
+        }
+      }
+    }
+    stage('scan with trivy') {
+        steps {
+            sh "rm html.tpl"
+            sh "wget https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl"
+            sh "curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin"
+            sh "trivy i -f template -t $TEMPLATE_PATH -o trivy-report.html --exit-code 0 --severity HIGH,MEDIUM,CRITICAL $imageLine"
+        }
+    }    
+    stage('Build and push stable image to registry') {
+      steps {
+        script {
+          docker.withRegistry('https://' + registry, registryCredential) {
+            def image = docker.build(repository + ':prod')
+            image.push()  
+          }
+        }
+      }
+    }
+}
+    post {
+    always {
+            archiveArtifacts artifacts: "trivy-report.html", fingerprint: true
+
+            publishHTML (target: [
+              allowMissing: false,
+              alwaysLinkToLastBuild: false,
+              keepAll: true,
+              reportDir: '.',
+              reportFiles: 'trivy-report.html',
+              reportName: "Trivy Report"
+            ])
+            }
+        }
+}
