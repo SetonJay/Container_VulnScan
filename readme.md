@@ -1,4 +1,4 @@
-## BuildSpec and Jenkins examples inscuding simple Post-Build Trivy or Grype Container Image Scan stages
+## BuildSpec and Jenkins examples with stages for Post-build container image scans, using open source container vulnerability scanners (Trivy / Grype) 
 See below:
 
 ## Install Trivy, download HTML template, and Scan Image and output results to file
