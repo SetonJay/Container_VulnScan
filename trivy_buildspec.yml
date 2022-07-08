@@ -1,0 +1,32 @@
+Env Variables:
+(use CodeBuild service role with ECR permissions for ECR access)
+REPOSITORY_URI:377877851685.dkr.ecr.eu-west-1.amazonaws.com
+
+# anchore-service account for ECR access
+AWS_ACCESS_KEY_ID="xyz" (ssm preferred)
+AWS_SECRET_ACCESS_KEY="abcdxyz" (ssm preferred) 
+AWS_DEFAULT_REGION=eu-west-1
+
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - apt-get update -y
+      - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+      - ArtifactPath=$(pwd)
+  pre_build:
+    commands:
+      - echo logging into Amazon ECR
+      - aws --version
+  build:
+    commands:
+      - cd $ArtifactPath
+      - wget https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl 
+      - trivy i -f template -t "@html.tpl" -o trivy-report.html --exit-code 0 --severity HIGH,MEDIUM,CRITICAL $REPOSITORY_URI/anchore-codebuildproject:latest
+  post_build:
+    commands:
+      - echo 'results of the SBOM and vulnerability sent to S3!'
+artifacts:
+  files:
+    - trivy-report.html
