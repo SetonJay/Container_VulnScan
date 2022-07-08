@@ -1,0 +1,33 @@
+Env Variables:
+(use CodeBuild service role with ECR permissions for ECR access)
+REPOSITORY_URI:377877851685.dkr.ecr.eu-west-1.amazonaws.com
+
+Buildspec.yml
+
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - apt-get update -y
+      - wget https://github.com/anchore/grype/releases/download/v0.40.1/grype_0.40.1_linux_amd64.deb
+      - sudo dpkg -i grype_0.40.1_linux_amd64.deb
+      - ArtifactPath=$(pwd)
+      
+  pre_build:
+    commands:
+      - echo logging into Amazon ECR
+      - aws --version
+      - aws ecr get-login-password | docker login --username AWS --password-stdin $REPOSITORY_URI
+  build:
+    commands:
+      - cd $ArtifactPath
+      - grype $REPOSITORY_URI/anchore-codebuildproject:latest | tee grype-codebuildproject
+      
+  post_build:
+    commands:
+      - echo 'results of the SBOM and vulnerability sent to S3!'
+      
+artifacts:
+  files:
+    - grype-codebuildproject
