@@ -10,8 +10,7 @@ phases:
   install:
     commands:
       - apt-get update -y
-      - wget https://github.com/anchore/grype/releases/download/v0.40.1/grype_0.40.1_linux_amd64.deb
-      - sudo dpkg -i grype_0.40.1_linux_amd64.deb
+      - curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
       - ArtifactPath=$(pwd)
       
   pre_build:
