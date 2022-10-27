@@ -1,0 +1,38 @@
+pipeline {
+  environment {
+    CONTAINER_NAME= 'jenkins-demo'
+  }
+  agent any
+  stages {
+    stage('Checkout SCM') {
+      steps {
+        checkout scm
+      }
+    }
+    stage('Detect Secrets in Repo') {
+    //  agent   { 
+    //    docker { image 'python:3.7.2' } 
+    //}
+      steps {
+        sh "rm *.html"
+        sh "pip install trufflehog3"
+        sh "touch ${CONTAINER_NAME}_trufflehog.html"
+        sh "trufflehog3 --no-history -f html | tee ${CONTAINER_NAME}_trufflehog.html"
+        withAWS(credentials:'aws-user'){
+          sh "aws s3 cp ${CONTAINER_NAME}_trufflehog.html s3://bucket-name/${CONTAINER_NAME}/"
+          }   
+      }
+    }
+    post {
+    always {
+           publishHTML (target: [
+              allowMissing: false,
+              alwaysLinkToLastBuild: false,
+              keepAll: true,
+              reportDir: '.',
+              reportFiles: '*.html',
+              reportName: "CI Security Report"
+            ])
+            }
+        }
+}
