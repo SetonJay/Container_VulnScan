@@ -18,7 +18,7 @@ See below:
  - grype $REPOSITORY_URI/repository:tag | tee {scan-results}
  
  
-# Build spec Artifact pull from $CODEBUILD_SRC_DIR
+## Build spec Artifact pull from $CODEBUILD_SRC_DIR
 ArtifactPath=$(pwd)
 cd $ArtifactPath
 
