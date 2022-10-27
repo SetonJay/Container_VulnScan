@@ -21,3 +21,6 @@ See below:
 # Build spec Artifact pull from $CODEBUILD_SRC_DIR
 ArtifactPath=$(pwd)
 cd $ArtifactPath
+
+##  Trufflehog Detect secrets from git-cloned Repo via CI, publishes report of results/artifacts 
+For this stage we leverage trufflehog3, an enhanced version of the truffleHog scanner, which is a popular open source project for finding secrets accidentally committed in repositories. It essentially searches through git repositories for secrets, digging deep into commit history and branches. It identifies secrets by running entropy checks as well as high signal regex checks.
