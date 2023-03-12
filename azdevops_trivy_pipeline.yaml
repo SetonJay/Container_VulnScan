@@ -1,0 +1,108 @@
+# Scan with SAST, Container Scan, Build and push an image to Azure Container Registry
+
+trigger:
+- main
+
+variables:
+  # Container registry service connection established during pipeline creation
+  dockerRegistryServiceConnection: '90709152-bd33-4fc6-93b4-74e86e9e3f25'
+  imageRepository: 'omniqrservice'
+  containerRegistry: 'orungbesetonacr.azurecr.io'
+  dockerfilePath: '$(Build.SourcesDirectory)/Dockerfile'
+  tag: '$(Build.BuildId)'
+  #SonarQube variables
+  sonarCloudEndpointName: 'SonarCloud'
+  sonarCloudOrganization: 'orungbeseton'
+  sonarCloudProjectKey: 'orungbeseton_PythonVote'
+  sonarCloudProjectName: 'PythonVote'
+  Parameters.mavenPOMFile: 'pom.xml'
+
+pool:
+  name: default
+  #demands:
+  #- java
+  #- Agent.Version -gtVersion 2.144.0
+  #- maven
+
+parameters:
+  - name: ForceImagePushImageWithVulnerability
+    values:
+      - true
+      - false
+    default: false
+    displayName: Force Image Push Image With Vulnerability
+
+stages:
+- stage: Build
+  displayName: Build image
+  jobs:
+  - job: Build
+    displayName: Build
+    steps:
+     # Build the Docker image
+    - task: Docker@2
+      inputs:
+        containerRegistry: $(dockerRegistryServiceConnection)
+        repository: $(imageRepository)
+        command: build
+        Dockerfile: $(Build.SourcesDirectory)/Dockerfile
+        tags: |
+          $(Build.BuildId)
+          latest
+
+- stage: ContainerScan
+  displayName: Container VA Scan
+  jobs:
+  - job: Run_Trivy_scan
+    displayName: Run Trivy scan
+    steps:
+    #Install Trivy
+      - task: CmdLine@2
+        displayName: Run_Trivy_scan
+        inputs:
+          script: |
+              sudo docker images
+              sudo apt-get install -y wget apt-transport-https gnupg lsb-release 
+              wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+              echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
+              sudo apt-get -y update
+              sudo apt-get -y install trivy
+              trivy image --format template --template "@junit.tpl" -o $(imageRepository).xml $(containerRegistry)/$(imageRepository):$(tag)
+
+  - job: Publish_Scan_Result
+    displayName: Publish Scan Result
+    dependsOn: Run_Trivy_scan
+    steps:
+  #Publish Scan Result
+    - ${{ if eq(parameters.ForceImagePushImageWithVulnerability, 'false') }}:
+      - task: PublishTestResults@2
+        inputs:
+          testResultsFormat: 'JUnit'
+          testResultsFiles: '$(imageRepository).xml'
+          mergeTestResults: true
+          failTaskOnFailedTests: true
+          testRunTitle: 'Trivy - Vulnerabilities Summary'
+    - ${{ if eq(parameters.ForceImagePushImageWithVulnerability, 'true') }}:
+      - task: PublishTestResults@2
+        inputs:
+          testResultsFormat: 'JUnit'
+          testResultsFiles: '$(imageRepository).xml'
+          mergeTestResults: true
+          failTaskOnFailedTests: false
+          testRunTitle: 'Trivy - Vulnerabilities Summary'
+
+- stage: Push_Image_to_ACR
+  displayName: Push Image to ACR
+  jobs:
+  - job: Push_Docker_image_to_ACR
+    displayName: Push the Docker image to ACR
+    steps:
+# Push the Docker image to ACR
+    - task: Docker@2
+      inputs:
+        containerRegistry: $(dockerRegistryServiceConnection)
+        repository: $(imageRepository)
+        command: push
+        tags: |
+          $(Build.BuildId)
+          latest
