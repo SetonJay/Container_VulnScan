@@ -65,9 +65,13 @@ stages:
               sudo apt-get install -y wget apt-transport-https gnupg lsb-release 
               wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
               echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
+              wget https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/junit.tpl $(Build.SourcesDirectory)/junit.tpl
+              wget https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl $(Build.SourcesDirectory)/html.tpl
               sudo apt-get -y update
               sudo apt-get -y install trivy
               trivy image --format template --template "@junit.tpl" -o $(imageRepository).xml $(containerRegistry)/$(imageRepository):$(tag)
+              trivy i -f template -t "@html.tpl" -o $(imageRepository).html --exit-code 0 --severity HIGH,MEDIUM,CRITICAL $(containerRegistry)/$(imageRepository):$(tag)
+
 
   - job: Publish_Scan_Result
     displayName: Publish Scan Result
@@ -90,6 +94,13 @@ stages:
           mergeTestResults: true
           failTaskOnFailedTests: false
           testRunTitle: 'Trivy - Vulnerabilities Summary'
+ #Publish Scan to Artifact
+      - task: PublishPipelineArtifact@1
+        displayName: 'Publish_Trivy_HTML'
+        inputs:
+          artifactName: '$(imageRepository).html'
+          targetPath: '$(Build.SourcesDirectory)/$(imageRepository).html'
+          publishLocation: 'pipeline'
 
 - stage: Push_Image_to_ACR
   displayName: Push Image to ACR
